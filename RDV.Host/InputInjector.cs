@@ -12,6 +12,10 @@ public static class InputInjector
 
     private const int SM_CXSCREEN = 0;
     private const int SM_CYSCREEN = 1;
+    private const int SM_XVIRTUALSCREEN = 76;
+    private const int SM_YVIRTUALSCREEN = 77;
+    private const int SM_CXVIRTUALSCREEN = 78;
+    private const int SM_CYVIRTUALSCREEN = 79;
 
     [StructLayout(LayoutKind.Sequential)]
     private struct INPUT
@@ -58,22 +62,34 @@ public static class InputInjector
     private const uint MOUSEEVENTF_MIDDLEUP = 0x0040;
     private const uint MOUSEEVENTF_WHEEL = 0x0800;
     private const uint MOUSEEVENTF_ABSOLUTE = 0x8000;
+    private const uint MOUSEEVENTF_VIRTUALDESK = 0x4000;
     private const uint KEYEVENTF_KEYUP = 0x0002;
     private const uint KEYEVENTF_EXTENDEDKEY = 0x0001;
 
-    public static void MouseMove(int x, int y)
+    public static void MouseMove(int x, int y, int screenLeft, int screenTop)
     {
-        int sw = GetSystemMetrics(SM_CXSCREEN);
-        int sh = GetSystemMetrics(SM_CYSCREEN);
-        int absX = (int)((double)x / sw * 65535);
-        int absY = (int)((double)y / sh * 65535);
+        int vLeft = GetSystemMetrics(SM_XVIRTUALSCREEN);
+        int vTop = GetSystemMetrics(SM_YVIRTUALSCREEN);
+        int vWidth = GetSystemMetrics(SM_CXVIRTUALSCREEN);
+        int vHeight = GetSystemMetrics(SM_CYVIRTUALSCREEN);
+        if (vWidth <= 0 || vHeight <= 0) return;
+
+        int targetX = screenLeft + x;
+        int targetY = screenTop + y;
+        int absX = (int)((double)(targetX - vLeft) / vWidth * 65535);
+        int absY = (int)((double)(targetY - vTop) / vHeight * 65535);
 
         Send(new INPUT
         {
             type = INPUT_MOUSE,
             union = new INPUTUNION
             {
-                mi = new MOUSEINPUT { dx = absX, dy = absY, dwFlags = MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE }
+                mi = new MOUSEINPUT
+                {
+                    dx = absX,
+                    dy = absY,
+                    dwFlags = MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK
+                }
             }
         });
     }

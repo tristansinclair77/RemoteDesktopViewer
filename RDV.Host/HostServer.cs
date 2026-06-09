@@ -86,16 +86,33 @@ public sealed class HostServer : IDisposable
             StatusChanged?.Invoke("Client connected");
 
             using var capture = new ScreenCapture(60);
+
+            var descriptors = ScreenCapture.EnumerateScreens();
+            await SendText(ws, JsonSerializer.Serialize(new
+            {
+                type = "screen_list",
+                screens = descriptors.Select(s => new
+                {
+                    index = s.Index,
+                    name = s.Name,
+                    width = s.Width,
+                    height = s.Height,
+                    primary = s.Primary
+                }).ToArray(),
+                selected = capture.SelectedIndex
+            }), ct);
+
             await SendText(ws, JsonSerializer.Serialize(new
             {
                 type = "screen_info",
                 width = capture.ScreenWidth,
-                height = capture.ScreenHeight
+                height = capture.ScreenHeight,
+                index = capture.SelectedIndex
             }), ct);
 
             using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct);
             var streamTask = StreamFrames(ws, capture, linked.Token);
-            var receiveTask = ReceiveInputs(ws, linked.Token);
+            var receiveTask = ReceiveInputs(ws, capture, linked.Token);
 
             await Task.WhenAny(streamTask, receiveTask);
             linked.Cancel();
@@ -113,7 +130,7 @@ public sealed class HostServer : IDisposable
 
     private static async Task StreamFrames(WebSocket ws, ScreenCapture capture, CancellationToken ct)
     {
-        int lastW = capture.ScreenWidth, lastH = capture.ScreenHeight;
+        int lastW = -1, lastH = -1, lastIdx = -1;
 
         while (!ct.IsCancellationRequested && ws.State == WebSocketState.Open)
         {
@@ -121,26 +138,26 @@ public sealed class HostServer : IDisposable
             {
                 var frame = capture.CaptureFrame();
 
-                // Notify viewer if screen dimensions changed
-                if (capture.ScreenWidth != lastW || capture.ScreenHeight != lastH)
+                if (frame.Width != lastW || frame.Height != lastH || frame.ScreenIndex != lastIdx)
                 {
-                    lastW = capture.ScreenWidth; lastH = capture.ScreenHeight;
+                    lastW = frame.Width; lastH = frame.Height; lastIdx = frame.ScreenIndex;
                     await SendText(ws, JsonSerializer.Serialize(new
                     {
                         type = "screen_info",
                         width = lastW,
-                        height = lastH
+                        height = lastH,
+                        index = lastIdx
                     }), ct);
                 }
 
-                await ws.SendAsync(frame.AsMemory(), WebSocketMessageType.Binary, true, ct);
+                await ws.SendAsync(frame.Data.AsMemory(), WebSocketMessageType.Binary, true, ct);
                 await Task.Delay(50, ct); // ~20 fps
             }
             catch { break; }
         }
     }
 
-    private static async Task ReceiveInputs(WebSocket ws, CancellationToken ct)
+    private static async Task ReceiveInputs(WebSocket ws, ScreenCapture capture, CancellationToken ct)
     {
         var buf = new byte[8192];
         while (!ct.IsCancellationRequested && ws.State == WebSocketState.Open)
@@ -158,7 +175,11 @@ public sealed class HostServer : IDisposable
                 switch (kind)
                 {
                     case "mouse_move":
-                        InputInjector.MouseMove(obj!["x"]!.GetValue<int>(), obj!["y"]!.GetValue<int>());
+                        InputInjector.MouseMove(
+                            obj!["x"]!.GetValue<int>(),
+                            obj!["y"]!.GetValue<int>(),
+                            capture.ScreenLeft,
+                            capture.ScreenTop);
                         break;
                     case "mouse_down":
                     case "mouse_up":
@@ -170,6 +191,9 @@ public sealed class HostServer : IDisposable
                     case "key_down":
                     case "key_up":
                         InputInjector.KeyEvent((ushort)obj!["vk"]!.GetValue<int>(), kind == "key_down");
+                        break;
+                    case "select_screen":
+                        capture.SetSelectedScreen(obj!["index"]!.GetValue<int>());
                         break;
                 }
             }

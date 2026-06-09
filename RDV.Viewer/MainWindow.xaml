@@ -52,6 +52,13 @@
                    MouseWheel="Desktop_MouseWheel"
                    Cursor="Cross"/>
 
+            <!-- Monitor selector overlay -->
+            <Border HorizontalAlignment="Left" VerticalAlignment="Top"
+                    Margin="8,6,0,0" Background="#88000000" CornerRadius="4" Padding="4,3"
+                    Visibility="Collapsed" x:Name="MonitorBarContainer">
+                <StackPanel Orientation="Horizontal" x:Name="MonitorBar"/>
+            </Border>
+
             <!-- Toolbar overlay -->
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top"
                         Margin="0,6,8,0" Opacity="0.75">

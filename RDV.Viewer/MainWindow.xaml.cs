@@ -1,6 +1,8 @@
 using System.IO;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
 namespace RDV.Viewer;
@@ -41,6 +43,7 @@ public partial class MainWindow : Window
             _client = new ViewerClient();
             _client.FrameReceived += OnFrameReceived;
             _client.ScreenInfoReceived += OnScreenInfo;
+            _client.ScreenListReceived += OnScreenList;
             _client.Disconnected += OnDisconnected;
 
             await _client.ConnectAsync(host, port, password);
@@ -99,6 +102,62 @@ public partial class MainWindow : Window
     private void OnScreenInfo(int w, int h)
     {
         Dispatcher.InvokeAsync(() => ResolutionLabel.Text = $"{w}×{h}");
+    }
+
+    private RemoteScreen[]? _screens;
+    private int _selectedScreen;
+
+    private void OnScreenList(RemoteScreen[] screens, int selected)
+    {
+        Dispatcher.InvokeAsync(() =>
+        {
+            _screens = screens;
+            _selectedScreen = selected;
+            RebuildMonitorBar();
+        });
+    }
+
+    private void RebuildMonitorBar()
+    {
+        MonitorBar.Children.Clear();
+        if (_screens == null || _screens.Length <= 1)
+        {
+            MonitorBarContainer.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        for (int i = 0; i < _screens.Length; i++)
+        {
+            var screen = _screens[i];
+            var isSelected = screen.Index == _selectedScreen;
+            var btn = new Button
+            {
+                Content = screen.Primary ? $"{i + 1}*" : $"{i + 1}",
+                Width = 32,
+                Height = 24,
+                Margin = new Thickness(2, 0, 2, 0),
+                FontSize = 12,
+                Background = isSelected ? new SolidColorBrush(Color.FromRgb(0x33, 0x88, 0xff))
+                                        : new SolidColorBrush(Color.FromRgb(0x44, 0x44, 0x44)),
+                Foreground = Brushes.White,
+                BorderThickness = new Thickness(0),
+                ToolTip = $"{screen.Name} — {screen.Width}×{screen.Height}{(screen.Primary ? " (primary)" : "")}",
+                Tag = screen.Index,
+                Cursor = Cursors.Hand
+            };
+            btn.Click += MonitorBtn_Click;
+            MonitorBar.Children.Add(btn);
+        }
+        MonitorBarContainer.Visibility = Visibility.Visible;
+    }
+
+    private void MonitorBtn_Click(object sender, RoutedEventArgs e)
+    {
+        if (_client == null || sender is not Button b || b.Tag is not int idx) return;
+        if (idx == _selectedScreen) return;
+        _selectedScreen = idx;
+        RebuildMonitorBar();
+        _ = _client.SendSelectScreenAsync(idx);
     }
 
     // ──────────────────── Input forwarding ────────────────────
@@ -193,6 +252,9 @@ public partial class MainWindow : Window
         WindowState = WindowState.Normal;
         ConnectBtn.IsEnabled = true;
         ConnectBtn.Content = "Connect";
+        _screens = null;
+        MonitorBar.Children.Clear();
+        MonitorBarContainer.Visibility = Visibility.Collapsed;
     }
 
     private void ShowError(string msg)

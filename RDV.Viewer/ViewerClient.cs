@@ -7,6 +7,8 @@ using System.Text.Json.Nodes;
 
 namespace RDV.Viewer;
 
+public sealed record RemoteScreen(int Index, string Name, int Width, int Height, bool Primary);
+
 public sealed class ViewerClient : IAsyncDisposable
 {
     private readonly ClientWebSocket _ws = new();
@@ -14,6 +16,7 @@ public sealed class ViewerClient : IAsyncDisposable
 
     public event Action<byte[]>? FrameReceived;
     public event Action<int, int>? ScreenInfoReceived;
+    public event Action<RemoteScreen[], int>? ScreenListReceived;
     public event Action? Disconnected;
 
     public int RemoteWidth { get; private set; } = 1920;
@@ -71,11 +74,29 @@ public sealed class ViewerClient : IAsyncDisposable
                 else if (msgType == WebSocketMessageType.Text)
                 {
                     var obj = JsonNode.Parse(Encoding.UTF8.GetString(data));
-                    if (obj?["type"]?.GetValue<string>() == "screen_info")
+                    var type = obj?["type"]?.GetValue<string>();
+                    if (type == "screen_info")
                     {
-                        RemoteWidth = obj["width"]!.GetValue<int>();
-                        RemoteHeight = obj["height"]!.GetValue<int>();
+                        RemoteWidth = obj!["width"]!.GetValue<int>();
+                        RemoteHeight = obj!["height"]!.GetValue<int>();
                         ScreenInfoReceived?.Invoke(RemoteWidth, RemoteHeight);
+                    }
+                    else if (type == "screen_list")
+                    {
+                        var arr = obj!["screens"]!.AsArray();
+                        var list = new RemoteScreen[arr.Count];
+                        for (int i = 0; i < arr.Count; i++)
+                        {
+                            var s = arr[i]!;
+                            list[i] = new RemoteScreen(
+                                s["index"]!.GetValue<int>(),
+                                s["name"]?.GetValue<string>() ?? $"Display {i + 1}",
+                                s["width"]!.GetValue<int>(),
+                                s["height"]!.GetValue<int>(),
+                                s["primary"]?.GetValue<bool>() ?? false);
+                        }
+                        var selected = obj["selected"]?.GetValue<int>() ?? 0;
+                        ScreenListReceived?.Invoke(list, selected);
                     }
                 }
             }
@@ -96,6 +117,9 @@ public sealed class ViewerClient : IAsyncDisposable
 
     public Task SendKeyAsync(int vk, bool down) =>
         SendTextAsync(JsonSerializer.Serialize(new { type = "input", kind = down ? "key_down" : "key_up", vk }), _cts.Token);
+
+    public Task SendSelectScreenAsync(int index) =>
+        SendTextAsync(JsonSerializer.Serialize(new { type = "input", kind = "select_screen", index }), _cts.Token);
 
     private async Task SendTextAsync(string text, CancellationToken ct)
     {
