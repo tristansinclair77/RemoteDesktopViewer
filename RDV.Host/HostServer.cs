@@ -85,7 +85,7 @@ public sealed class HostServer : IDisposable
             await SendText(ws, JsonSerializer.Serialize(new { type = "auth_ok" }), ct);
             StatusChanged?.Invoke("Client connected");
 
-            using var capture = new ScreenCapture(60);
+            using var capture = new ScreenCapture(40);
 
             var descriptors = ScreenCapture.EnumerateScreens();
             await SendText(ws, JsonSerializer.Serialize(new
@@ -131,6 +131,7 @@ public sealed class HostServer : IDisposable
     private static async Task StreamFrames(WebSocket ws, ScreenCapture capture, CancellationToken ct)
     {
         int lastW = -1, lastH = -1, lastIdx = -1;
+        ulong lastHash = 0;
 
         while (!ct.IsCancellationRequested && ws.State == WebSocketState.Open)
         {
@@ -141,6 +142,7 @@ public sealed class HostServer : IDisposable
                 if (frame.Width != lastW || frame.Height != lastH || frame.ScreenIndex != lastIdx)
                 {
                     lastW = frame.Width; lastH = frame.Height; lastIdx = frame.ScreenIndex;
+                    lastHash = 0; // Force send on resolution/screen change
                     await SendText(ws, JsonSerializer.Serialize(new
                     {
                         type = "screen_info",
@@ -150,8 +152,14 @@ public sealed class HostServer : IDisposable
                     }), ct);
                 }
 
-                await ws.SendAsync(frame.Data.AsMemory(), WebSocketMessageType.Binary, true, ct);
-                await Task.Delay(50, ct); // ~20 fps
+                var hash = System.IO.Hashing.XxHash64.HashToUInt64(frame.Data);
+                if (hash != lastHash)
+                {
+                    lastHash = hash;
+                    await ws.SendAsync(frame.Data.AsMemory(), WebSocketMessageType.Binary, true, ct);
+                }
+
+                await Task.Delay(33, ct); // ~30 fps
             }
             catch { break; }
         }
