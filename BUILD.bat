@@ -2,8 +2,7 @@
 setlocal
 
 set OUT=C:\ProgramData\i2Systems\Tools\RemoteDesktopViewer
-set SIGNTOOL="C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe"
-set THUMBPRINT=B93F080C077A15FBDB3A0850B47429CB142CADF4
+set THUMBPRINT=2BD8E89BABDE8EE56906BDD577BB1E794AA797DC
 set TIMESTAMP=http://timestamp.digicert.com
 
 echo [1/5] Stopping any running RDV processes...
@@ -41,11 +40,14 @@ dotnet publish RDV.Viewer\RDV.Viewer.csproj -c Release -r win-x64 --self-contain
 if errorlevel 1 ( echo ERROR: Viewer build failed. & exit /b 1 )
 
 echo [5/5] Signing executables...
-%SIGNTOOL% sign /sha1 %THUMBPRINT% /fd SHA256 /tr "%TIMESTAMP%" /td SHA256 "%OUT%\RDV.Host.exe"
-if errorlevel 1 ( echo ERROR: Signing RDV.Host.exe failed. & exit /b 1 )
-
-%SIGNTOOL% sign /sha1 %THUMBPRINT% /fd SHA256 /tr "%TIMESTAMP%" /td SHA256 "%OUT%\RDV.Viewer.exe"
-if errorlevel 1 ( echo ERROR: Signing RDV.Viewer.exe failed. & exit /b 1 )
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+  "$cert = Get-ChildItem 'Cert:\CurrentUser\My\%THUMBPRINT%' -ErrorAction Stop;" ^
+  "foreach ($exe in 'RDV.Host.exe','RDV.Viewer.exe') {" ^
+  "  $sig = Set-AuthenticodeSignature -FilePath \"%OUT%\$exe\" -Certificate $cert -HashAlgorithm SHA256 -TimestampServer '%TIMESTAMP%' -IncludeChain All;" ^
+  "  if ($sig.Status -ne 'Valid') { Write-Host \"ERROR: signing $exe -> $($sig.Status)\"; exit 1 }" ^
+  "  Write-Host \"  $exe -> $($sig.Status)\"" ^
+  "}"
+if errorlevel 1 ( echo ERROR: Signing failed. & exit /b 1 )
 
 echo.
 echo Build complete. Output: %OUT%
