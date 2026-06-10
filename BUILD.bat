@@ -28,12 +28,16 @@ if not exist "%OUT%" mkdir "%OUT%"
 
 echo [3/5] Publishing RDV.Host...
 dotnet publish RDV.Host\RDV.Host.csproj -c Release -r win-x64 --self-contained false ^
-  -p:PublishSingleFile=true -p:DebugType=none -o "%OUT%"
+  -p:PublishSingleFile=true -p:DebugType=none ^
+  -p:IncludeNativeLibrariesForSelfExtract=true -p:IncludeAllContentForSelfExtract=true ^
+  -o "%OUT%"
 if errorlevel 1 ( echo ERROR: Host build failed. & exit /b 1 )
 
 echo [4/5] Publishing RDV.Viewer...
 dotnet publish RDV.Viewer\RDV.Viewer.csproj -c Release -r win-x64 --self-contained false ^
-  -p:PublishSingleFile=true -p:DebugType=none -o "%OUT%"
+  -p:PublishSingleFile=true -p:DebugType=none ^
+  -p:IncludeNativeLibrariesForSelfExtract=true -p:IncludeAllContentForSelfExtract=true ^
+  -o "%OUT%"
 if errorlevel 1 ( echo ERROR: Viewer build failed. & exit /b 1 )
 
 echo [5/5] Signing executables...
