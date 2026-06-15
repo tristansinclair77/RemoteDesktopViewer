@@ -10,7 +10,7 @@ namespace RDV.Host;
 public sealed class HostServer : IDisposable
 {
     private readonly Config _config;
-    private readonly HttpListener _listener;
+    private HttpListener _listener;
     private readonly CancellationTokenSource _cts = new();
     private volatile bool _clientConnected;
 
@@ -19,13 +19,30 @@ public sealed class HostServer : IDisposable
     public HostServer(Config config)
     {
         _config = config;
-        _listener = new HttpListener();
-        _listener.Prefixes.Add($"http://+:{config.Port}/rdv/");
+        _listener = NewListener();
+    }
+
+    private HttpListener NewListener()
+    {
+        var l = new HttpListener();
+        l.Prefixes.Add($"http://+:{_config.Port}/rdv/");
+        return l;
     }
 
     public void Start()
     {
-        _listener.Start();
+        try
+        {
+            _listener.Start();
+        }
+        catch (HttpListenerException ex) when (ex.ErrorCode == 32 || ex.ErrorCode == 183)
+        {
+            StatusChanged?.Invoke($"Port {_config.Port} in use — freeing it");
+            if (!PortReclaimer.TryFreePort(_config.Port)) throw;
+            Thread.Sleep(500);
+            _listener = NewListener();
+            _listener.Start();
+        }
         _ = AcceptLoop(_cts.Token);
         StatusChanged?.Invoke($"Listening on port {_config.Port}");
     }
