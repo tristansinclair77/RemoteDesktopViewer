@@ -149,17 +149,18 @@ public sealed class HostServer : IDisposable
     {
         int lastW = -1, lastH = -1, lastIdx = -1;
         ulong lastHash = 0;
+        var lastSentAt = DateTime.UtcNow;
 
         while (!ct.IsCancellationRequested && ws.State == WebSocketState.Open)
         {
             try
             {
-                var frame = capture.CaptureFrame();
+                var frame = await capture.CaptureFrameAsync(ct);
 
                 if (frame.Width != lastW || frame.Height != lastH || frame.ScreenIndex != lastIdx)
                 {
                     lastW = frame.Width; lastH = frame.Height; lastIdx = frame.ScreenIndex;
-                    lastHash = 0; // Force send on resolution/screen change
+                    lastHash = 0;
                     await SendText(ws, JsonSerializer.Serialize(new
                     {
                         type = "screen_info",
@@ -169,14 +170,25 @@ public sealed class HostServer : IDisposable
                     }), ct);
                 }
 
-                var hash = System.IO.Hashing.XxHash64.HashToUInt64(frame.Data);
+                var hash = frame.Data.Length > 0
+                    ? System.IO.Hashing.XxHash64.HashToUInt64(frame.Data)
+                    : 0;
+
                 if (hash != lastHash)
                 {
                     lastHash = hash;
-                    await ws.SendAsync(frame.Data.AsMemory(), WebSocketMessageType.Binary, true, ct);
+                    lastSentAt = DateTime.UtcNow;
+                    if (frame.Data.Length > 0)
+                        await ws.SendAsync(frame.Data.AsMemory(), WebSocketMessageType.Binary, true, ct);
+                }
+                else if ((DateTime.UtcNow - lastSentAt).TotalSeconds >= 5)
+                {
+                    // Screen is static but connection is alive — tell the viewer.
+                    lastSentAt = DateTime.UtcNow;
+                    await SendText(ws, JsonSerializer.Serialize(new { type = "heartbeat" }), ct);
                 }
 
-                await Task.Delay(33, ct); // ~30 fps
+                await Task.Delay(33, ct);
             }
             catch { break; }
         }
@@ -219,6 +231,13 @@ public sealed class HostServer : IDisposable
                         break;
                     case "select_screen":
                         capture.SetSelectedScreen(obj!["index"]!.GetValue<int>());
+                        break;
+                    case "send_sas":
+                        InputInjector.SendSas();
+                        break;
+                    case "restart":
+                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
+                            "shutdown", "/r /t 5") { UseShellExecute = false, CreateNoWindow = true });
                         break;
                 }
             }

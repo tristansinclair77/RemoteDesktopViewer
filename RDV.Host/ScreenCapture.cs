@@ -10,6 +10,8 @@ public sealed class ScreenCapture : IDisposable
     private readonly object _lock = new();
     private int _selectedIndex;
     private Rectangle _selectedBounds;
+    private byte[]? _lastFrameData;
+    private Task<CapturedFrame>? _pendingCapture;
 
     public int SelectedIndex { get { lock (_lock) return _selectedIndex; } }
     public int ScreenWidth { get { lock (_lock) return _selectedBounds.Width; } }
@@ -67,6 +69,34 @@ public sealed class ScreenCapture : IDisposable
         using var ms = new MemoryStream();
         bmp.Save(ms, _jpegCodec, _encoderParams);
         return new CapturedFrame(ms.ToArray(), bounds.Width, bounds.Height, idx);
+    }
+
+    // Runs CaptureFrame() with a 2-second timeout. If GDI hangs (frozen desktop), returns the
+    // last successfully captured frame so the streaming loop never blocks indefinitely.
+    public async Task<CapturedFrame> CaptureFrameAsync(CancellationToken ct)
+    {
+        // If a prior capture is still stuck, don't queue another thread — just return last frame.
+        if (_pendingCapture != null && !_pendingCapture.IsCompleted)
+            return LastFrameFallback();
+
+        _pendingCapture = Task.Run(CaptureFrame, CancellationToken.None);
+        try
+        {
+            var frame = await _pendingCapture.WaitAsync(TimeSpan.FromSeconds(2), ct);
+            lock (_lock) _lastFrameData = frame.Data;
+            return frame;
+        }
+        catch (TimeoutException)
+        {
+            return LastFrameFallback();
+        }
+    }
+
+    private CapturedFrame LastFrameFallback()
+    {
+        byte[] data; Rectangle bounds; int idx;
+        lock (_lock) { data = _lastFrameData ?? []; bounds = _selectedBounds; idx = _selectedIndex; }
+        return new CapturedFrame(data, bounds.Width, bounds.Height, idx);
     }
 
     public void Dispose() => _encoderParams.Dispose();

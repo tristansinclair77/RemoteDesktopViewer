@@ -143,4 +143,13 @@ public static class InputInjector
 
     private static void Send(INPUT input) =>
         SendInput(1, [input], Marshal.SizeOf<INPUT>());
+
+    [DllImport("sas.dll")]
+    private static extern void SendSAS(bool asUser);
+
+    public static bool SendSas()
+    {
+        try { SendSAS(false); return true; }
+        catch { return false; }
+    }
 }

@@ -18,6 +18,7 @@ public sealed class ViewerClient : IAsyncDisposable
     public event Action<int, int>? ScreenInfoReceived;
     public event Action<RemoteScreen[], int>? ScreenListReceived;
     public event Action? Disconnected;
+    public event Action? HeartbeatReceived;
 
     public int RemoteWidth { get; private set; } = 1920;
     public int RemoteHeight { get; private set; } = 1080;
@@ -81,6 +82,10 @@ public sealed class ViewerClient : IAsyncDisposable
                         RemoteHeight = obj!["height"]!.GetValue<int>();
                         ScreenInfoReceived?.Invoke(RemoteWidth, RemoteHeight);
                     }
+                    else if (type == "heartbeat")
+                    {
+                        HeartbeatReceived?.Invoke();
+                    }
                     else if (type == "screen_list")
                     {
                         var arr = obj!["screens"]!.AsArray();
@@ -120,6 +125,12 @@ public sealed class ViewerClient : IAsyncDisposable
 
     public Task SendSelectScreenAsync(int index) =>
         SendTextAsync(JsonSerializer.Serialize(new { type = "input", kind = "select_screen", index }), _cts.Token);
+
+    public Task SendSasAsync() =>
+        SendTextAsync(JsonSerializer.Serialize(new { type = "input", kind = "send_sas" }), _cts.Token);
+
+    public Task SendRestartAsync() =>
+        SendTextAsync(JsonSerializer.Serialize(new { type = "input", kind = "restart" }), _cts.Token);
 
     private async Task SendTextAsync(string text, CancellationToken ct)
     {

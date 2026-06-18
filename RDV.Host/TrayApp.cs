@@ -52,6 +52,14 @@ public sealed class TrayApp : ApplicationContext
             _addressItem.Text = address;
     }
 
+    public void ShowBalloon(string title, string text)
+    {
+        if (_tray.ContextMenuStrip!.InvokeRequired)
+            _tray.ContextMenuStrip.Invoke(() => _tray.ShowBalloonTip(6000, title, text, ToolTipIcon.Info));
+        else
+            _tray.ShowBalloonTip(6000, title, text, ToolTipIcon.Info);
+    }
+
     private void ExitApp(HostServer server)
     {
         server.Stop();

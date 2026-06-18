@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Sockets;
 using System.Security.Principal;
 using RDV.Host;
 
@@ -37,6 +39,7 @@ if (config.IsFirstRun)
 
     FirstRunSetup.AddFirewallRule(config.Port);
     FirstRunSetup.RegisterAutoStart();
+    FirstRunSetup.EnableSoftwareSAS();
 
     var address = config.DuckDnsSubdomain != null
         ? $"{config.DuckDnsSubdomain}.duckdns.org:{config.Port}"
@@ -54,20 +57,35 @@ if (config.IsFirstRun)
 using var server = new HostServer(config);
 server.Start();
 
-string? connectionAddress = config.DuckDnsSubdomain != null
-    ? $"Connect to: {config.DuckDnsSubdomain}.duckdns.org:{config.Port}"
+var localIP = GetLocalIP();
+string? dnsAddress = config.DuckDnsSubdomain != null
+    ? $"{config.DuckDnsSubdomain}.duckdns.org:{config.Port}"
     : null;
 
-var tray = new TrayApp(server, config, connectionAddress);
+// Show local IP immediately so it's always visible in the tray.
+var tray = new TrayApp(server, config, dnsAddress ?? $"Local: {localIP}:{config.Port}");
 
-// UPnP in background
+// Background: fetch public IP, update tray, show balloon.
 _ = Task.Run(async () =>
 {
-    bool ok = await UPnPHelper.TryMapPortAsync(config.Port);
-    if (!ok && connectionAddress == null)
-        tray.UpdateAddress($"UPnP failed — set up port forwarding for port {config.Port}");
-    else if (ok && connectionAddress == null)
-        tray.UpdateAddress($"UPnP active on port {config.Port}");
+    var publicIP = await GetPublicIPAsync();
+    bool upnpOk = await UPnPHelper.TryMapPortAsync(config.Port);
+
+    string connectLine = dnsAddress != null
+        ? $"Connect to: {dnsAddress}"
+        : publicIP != null
+            ? $"Public: {publicIP}:{config.Port}"
+            : upnpOk
+                ? $"UPnP active — public IP unknown, port {config.Port} forwarded"
+                : $"Local: {localIP}:{config.Port} (port forwarding may be needed)";
+
+    tray.UpdateAddress(connectLine);
+    tray.ShowBalloon("RDV Host Ready",
+        dnsAddress != null
+            ? $"Connect to: {dnsAddress}\nLocal: {localIP}:{config.Port}"
+            : publicIP != null
+                ? $"Public: {publicIP}:{config.Port}\nLocal: {localIP}:{config.Port}"
+                : $"Local: {localIP}:{config.Port}");
 });
 
 // DuckDNS updater
@@ -86,4 +104,27 @@ static bool IsAdmin()
 {
     using var id = WindowsIdentity.GetCurrent();
     return new WindowsPrincipal(id).IsInRole(WindowsBuiltInRole.Administrator);
+}
+
+static string GetLocalIP()
+{
+    try
+    {
+        var addresses = Dns.GetHostEntry(Dns.GetHostName()).AddressList;
+        var ip = addresses.FirstOrDefault(a =>
+            a.AddressFamily == AddressFamily.InterNetwork && !IPAddress.IsLoopback(a));
+        return ip?.ToString() ?? "unknown";
+    }
+    catch { return "unknown"; }
+}
+
+static async Task<string?> GetPublicIPAsync()
+{
+    try
+    {
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(8) };
+        var ip = await http.GetStringAsync("https://api.ipify.org");
+        return ip.Trim();
+    }
+    catch { return null; }
 }

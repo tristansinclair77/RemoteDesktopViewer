@@ -43,7 +43,50 @@
 
         <!-- ═══════════════════════════════════ DESKTOP PANEL ═══════════════════════════════════ -->
         <Grid x:Name="DesktopPanel" Visibility="Collapsed">
-            <Image x:Name="DesktopImage"
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- Toolbar row -->
+            <Border Grid.Row="0" Background="#2a2a2a" Padding="6,4">
+                <Grid>
+                    <!-- Monitor selector (left) -->
+                    <Border x:Name="MonitorBarContainer" HorizontalAlignment="Left"
+                            Background="#44000000" CornerRadius="4" Padding="4,2"
+                            Visibility="Collapsed">
+                        <StackPanel Orientation="Horizontal" x:Name="MonitorBar"/>
+                    </Border>
+
+                    <!-- Key combos + status + disconnect (right) -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Content="Task Mgr" Padding="8,3" FontSize="12" Margin="0,0,4,0"
+                                Background="#555" ToolTip="Send Ctrl+Shift+Esc to remote"
+                                Click="KeyTaskMgr_Click"/>
+                        <Button Content="Win+D" Padding="8,3" FontSize="12" Margin="0,0,4,0"
+                                Background="#555" ToolTip="Send Win+D to remote"
+                                Click="KeyWinD_Click"/>
+                        <Button Content="Win+R" Padding="8,3" FontSize="12" Margin="0,0,4,0"
+                                Background="#555" ToolTip="Send Win+R (Run dialog) to remote"
+                                Click="KeyWinR_Click"/>
+                        <Button Content="Ctrl+Alt+Del" Padding="8,3" FontSize="12" Margin="0,0,4,0"
+                                Background="#555" ToolTip="Send Secure Attention Sequence to remote"
+                                Click="KeySas_Click"/>
+                        <Button Content="Restart PC" Padding="8,3" FontSize="12" Margin="0,0,12,0"
+                                Background="#884400" ToolTip="Send restart command to remote PC"
+                                Click="RestartPC_Click"/>
+                        <TextBlock x:Name="ConnectionStatusLabel" FontSize="11"
+                                   VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <TextBlock x:Name="ResolutionLabel" Foreground="#aaa" FontSize="11"
+                                   VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <Button Content="Disconnect" Padding="8,3" FontSize="12"
+                                Background="#cc3333" Click="DisconnectBtn_Click"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Desktop image -->
+            <Image Grid.Row="1" x:Name="DesktopImage"
                    Stretch="Uniform"
                    RenderOptions.BitmapScalingMode="HighQuality"
                    MouseMove="Desktop_MouseMove"
@@ -51,22 +94,6 @@
                    MouseUp="Desktop_MouseUp"
                    MouseWheel="Desktop_MouseWheel"
                    Cursor="Cross"/>
-
-            <!-- Monitor selector overlay -->
-            <Border HorizontalAlignment="Left" VerticalAlignment="Top"
-                    Margin="8,6,0,0" Background="#88000000" CornerRadius="4" Padding="4,3"
-                    Visibility="Collapsed" x:Name="MonitorBarContainer">
-                <StackPanel Orientation="Horizontal" x:Name="MonitorBar"/>
-            </Border>
-
-            <!-- Toolbar overlay -->
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top"
-                        Margin="0,6,8,0" Opacity="0.75">
-                <TextBlock x:Name="ResolutionLabel" Foreground="#aaa" FontSize="11"
-                           VerticalAlignment="Center" Margin="0,0,10,0"/>
-                <Button Content="Disconnect" Padding="8,3" FontSize="12"
-                        Background="#cc3333" Click="DisconnectBtn_Click"/>
-            </StackPanel>
         </Grid>
     </Grid>
 </Window>

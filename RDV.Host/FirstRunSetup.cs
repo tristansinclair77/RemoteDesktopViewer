@@ -18,6 +18,19 @@ public static class FirstRunSetup
         Run("schtasks", $"/Create /TN \"RDV Host\" /TR \"\\\"{exePath}\\\"\" /SC ONLOGON /RL HIGHEST /F");
     }
 
+    // Allows user-space apps to call SendSAS() (needed for Ctrl+Alt+Del forwarding).
+    // Requires admin — call this during first-run setup.
+    public static void EnableSoftwareSAS()
+    {
+        try
+        {
+            using var key = Microsoft.Win32.Registry.LocalMachine.CreateSubKey(
+                @"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System");
+            key?.SetValue("SoftwareSASGeneration", 3, Microsoft.Win32.RegistryValueKind.DWord);
+        }
+        catch { }
+    }
+
     public static void RemoveAutoStart()
     {
         Run("schtasks", "/Delete /TN \"RDV Host\" /F");

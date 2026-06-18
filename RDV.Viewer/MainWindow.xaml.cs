@@ -4,6 +4,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Threading;
 
 namespace RDV.Viewer;
 
@@ -12,6 +13,9 @@ public partial class MainWindow : Window
     private ViewerClient? _client;
     private KeyboardHook? _hook;
     private bool _connected;
+    private DateTime _lastFrameTime;
+    private DateTime _lastActivityTime;
+    private DispatcherTimer? _statusTimer;
 
     public MainWindow()
     {
@@ -45,6 +49,7 @@ public partial class MainWindow : Window
             _client.ScreenInfoReceived += OnScreenInfo;
             _client.ScreenListReceived += OnScreenList;
             _client.Disconnected += OnDisconnected;
+            _client.HeartbeatReceived += OnHeartbeat;
 
             await _client.ConnectAsync(host, port, password);
 
@@ -96,7 +101,12 @@ public partial class MainWindow : Window
         }
         catch { return; }
 
-        Dispatcher.InvokeAsync(() => DesktopImage.Source = bmp);
+        Dispatcher.InvokeAsync(() =>
+        {
+            DesktopImage.Source = bmp;
+            _lastFrameTime = DateTime.UtcNow;
+            _lastActivityTime = DateTime.UtcNow;
+        });
     }
 
     private void OnScreenInfo(int w, int h)
@@ -189,6 +199,79 @@ public partial class MainWindow : Window
         _ = _client.SendMouseWheelAsync(e.Delta);
     }
 
+    private async void KeyTaskMgr_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_connected || _client == null) return;
+        await _client.SendKeyAsync(0xA2, true);  // LCtrl down
+        await _client.SendKeyAsync(0xA0, true);  // LShift down
+        await _client.SendKeyAsync(0x1B, true);  // Esc down
+        await _client.SendKeyAsync(0x1B, false);
+        await _client.SendKeyAsync(0xA0, false);
+        await _client.SendKeyAsync(0xA2, false);
+    }
+
+    private async void KeyWinD_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_connected || _client == null) return;
+        await _client.SendKeyAsync(0x5B, true);  // LWin down
+        await _client.SendKeyAsync(0x44, true);  // D down
+        await _client.SendKeyAsync(0x44, false);
+        await _client.SendKeyAsync(0x5B, false);
+    }
+
+    private async void KeyWinR_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_connected || _client == null) return;
+        await _client.SendKeyAsync(0x5B, true);  // LWin down
+        await _client.SendKeyAsync(0x52, true);  // R down
+        await _client.SendKeyAsync(0x52, false);
+        await _client.SendKeyAsync(0x5B, false);
+    }
+
+    private async void KeySas_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_connected || _client == null) return;
+        await _client.SendSasAsync();
+    }
+
+    private async void RestartPC_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_connected || _client == null) return;
+        var result = MessageBox.Show(
+            "Send a restart command to the remote PC?\n\nIt will reboot in 5 seconds.",
+            "Restart Remote PC", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+        if (result != MessageBoxResult.Yes) return;
+        await _client.SendRestartAsync();
+    }
+
+    private void OnHeartbeat()
+    {
+        Dispatcher.InvokeAsync(() => _lastActivityTime = DateTime.UtcNow);
+    }
+
+    private void UpdateConnectionStatus(object? sender, EventArgs e)
+    {
+        var now = DateTime.UtcNow;
+        var sinceFrame = now - _lastFrameTime;
+        var sinceActivity = now - _lastActivityTime;
+
+        if (sinceFrame.TotalSeconds < 2)
+        {
+            ConnectionStatusLabel.Text = "● Live";
+            ConnectionStatusLabel.Foreground = new SolidColorBrush(Color.FromRgb(0x44, 0xdd, 0x66));
+        }
+        else if (sinceActivity.TotalSeconds < 15)
+        {
+            ConnectionStatusLabel.Text = $"⚠ Frozen {(int)sinceFrame.TotalSeconds}s";
+            ConnectionStatusLabel.Foreground = new SolidColorBrush(Color.FromRgb(0xff, 0xaa, 0x33));
+        }
+        else
+        {
+            ConnectionStatusLabel.Text = "✕ No signal";
+            ConnectionStatusLabel.Foreground = new SolidColorBrush(Color.FromRgb(0xff, 0x6b, 0x6b));
+        }
+    }
+
     private void OnRemoteKey(int vk, bool isDown)
     {
         if (!_connected || _client == null) return;
@@ -239,6 +322,11 @@ public partial class MainWindow : Window
     {
         _connected = true;
         if (_hook != null) _hook.Active = true;
+        _lastFrameTime = DateTime.UtcNow;
+        _lastActivityTime = DateTime.UtcNow;
+        _statusTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        _statusTimer.Tick += UpdateConnectionStatus;
+        _statusTimer.Start();
         ConnectPanel.Visibility = Visibility.Collapsed;
         DesktopPanel.Visibility = Visibility.Visible;
         WindowState = WindowState.Maximized;
@@ -247,6 +335,8 @@ public partial class MainWindow : Window
 
     private void ShowConnect()
     {
+        _statusTimer?.Stop();
+        _statusTimer = null;
         DesktopPanel.Visibility = Visibility.Collapsed;
         ConnectPanel.Visibility = Visibility.Visible;
         WindowState = WindowState.Normal;
