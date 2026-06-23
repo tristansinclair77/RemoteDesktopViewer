@@ -68,6 +68,9 @@
                         <Button Content="Ctrl+Alt+Del" Padding="8,3" FontSize="12" Margin="0,0,4,0"
                                 Background="#555" ToolTip="Send Secure Attention Sequence to remote"
                                 Click="KeySas_Click"/>
+                        <Button Content="Run as Admin..." Padding="8,3" FontSize="12" Margin="0,0,4,0"
+                                Background="#226622" ToolTip="Run a command on the remote PC with admin privileges (no UAC)"
+                                Click="RunAsAdmin_Click"/>
                         <Button Content="Restart PC" Padding="8,3" FontSize="12" Margin="0,0,12,0"
                                 Background="#884400" ToolTip="Send restart command to remote PC"
                                 Click="RestartPC_Click"/>

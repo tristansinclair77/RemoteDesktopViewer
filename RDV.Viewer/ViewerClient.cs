@@ -132,6 +132,9 @@ public sealed class ViewerClient : IAsyncDisposable
     public Task SendRestartAsync() =>
         SendTextAsync(JsonSerializer.Serialize(new { type = "input", kind = "restart" }), _cts.Token);
 
+    public Task SendRunAsync(string file, string args) =>
+        SendTextAsync(JsonSerializer.Serialize(new { type = "input", kind = "run", file, args }), _cts.Token);
+
     private async Task SendTextAsync(string text, CancellationToken ct)
     {
         if (_ws.State != WebSocketState.Open) return;

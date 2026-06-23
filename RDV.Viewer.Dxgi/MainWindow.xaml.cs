@@ -239,6 +239,104 @@ public partial class MainWindow : Window
         await _client.SendRestartAsync();
     }
 
+    private async void RunAsAdmin_Click(object sender, RoutedEventArgs e)
+    {
+        if (!_connected || _client == null) return;
+        var entered = ShowRunAsAdminDialog();
+        if (entered == null) return;
+        var (file, args) = entered.Value;
+        try { await _client.SendRunAsync(file, args); }
+        catch (Exception ex)
+        {
+            MessageBox.Show("Failed to send run command: " + ex.Message,
+                "Run as Admin", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+    }
+
+    private (string file, string args)? ShowRunAsAdminDialog()
+    {
+        var dlg = new Window
+        {
+            Title = "Run as Admin on Remote (DXGI)",
+            Width = 500,
+            Height = 240,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            Owner = this,
+            Background = new SolidColorBrush(Color.FromRgb(0x1e, 0x1e, 0x1e)),
+            Foreground = Brushes.White,
+            ResizeMode = ResizeMode.NoResize,
+        };
+
+        var grid = new Grid { Margin = new Thickness(16) };
+        for (int i = 0; i < 6; i++) grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+        TextBlock Lbl(string t, int row, Thickness? m = null)
+        {
+            var tb = new TextBlock
+            {
+                Text = t,
+                Foreground = new SolidColorBrush(Color.FromRgb(0xaa, 0xaa, 0xaa)),
+                Margin = m ?? new Thickness(0, 0, 0, 4),
+            };
+            Grid.SetRow(tb, row);
+            grid.Children.Add(tb);
+            return tb;
+        }
+
+        Lbl("Inherits the host's admin token. Anything you launch runs elevated, no UAC prompt.",
+            0, new Thickness(0, 0, 0, 12));
+        Lbl("File or program (e.g. C:\\path\\to\\foo.exe, or just \"cmd\" / \"powershell\"):", 1);
+
+        var fileBox = new TextBox { Margin = new Thickness(0, 0, 0, 10), FontFamily = new FontFamily("Consolas") };
+        Grid.SetRow(fileBox, 2); grid.Children.Add(fileBox);
+
+        Lbl("Arguments (optional):", 3);
+
+        var argsBox = new TextBox { Margin = new Thickness(0, 0, 0, 16), FontFamily = new FontFamily("Consolas") };
+        Grid.SetRow(argsBox, 4); grid.Children.Add(argsBox);
+
+        var btnPanel = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right,
+        };
+        var runBtn = new Button
+        {
+            Content = "Run as Admin",
+            Width = 130, Height = 32,
+            Margin = new Thickness(0, 0, 8, 0),
+            Background = new SolidColorBrush(Color.FromRgb(0x22, 0x66, 0x22)),
+            IsDefault = true,
+        };
+        var cancelBtn = new Button
+        {
+            Content = "Cancel",
+            Width = 90, Height = 32,
+            Background = new SolidColorBrush(Color.FromRgb(0x55, 0x55, 0x55)),
+            IsCancel = true,
+        };
+        btnPanel.Children.Add(runBtn);
+        btnPanel.Children.Add(cancelBtn);
+        Grid.SetRow(btnPanel, 5);
+        grid.Children.Add(btnPanel);
+
+        dlg.Content = grid;
+
+        bool confirmed = false;
+        runBtn.Click += (_, _) =>
+        {
+            if (string.IsNullOrWhiteSpace(fileBox.Text)) { fileBox.Focus(); return; }
+            confirmed = true;
+            dlg.Close();
+        };
+        cancelBtn.Click += (_, _) => dlg.Close();
+
+        dlg.Loaded += (_, _) => fileBox.Focus();
+        dlg.ShowDialog();
+
+        return confirmed ? (fileBox.Text.Trim(), argsBox.Text) : null;
+    }
+
     private void OnHeartbeat()
     {
         Dispatcher.InvokeAsync(() => _lastActivityTime = DateTime.UtcNow);

@@ -239,9 +239,45 @@ public sealed class HostServer : IDisposable
                         System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
                             "shutdown", "/r /t 5") { UseShellExecute = false, CreateNoWindow = true });
                         break;
+                    case "run":
+                        HandleRunCommand(obj);
+                        break;
                 }
             }
             catch { break; }
+        }
+    }
+
+    // Spawns a process as a child of the host (which already runs as admin per
+    // its requireAdministrator manifest). The child inherits the host's primary
+    // token, so it runs elevated with no UAC prompt -- this is the whole point
+    // of the command, and the reason a strong password on the host is critical:
+    // anyone who authenticates gets admin shell on the box.
+    private static void HandleRunCommand(JsonNode? obj)
+    {
+        if (obj == null) return;
+        var file = obj["file"]?.GetValue<string>();
+        if (string.IsNullOrWhiteSpace(file)) return;
+        var args = obj["args"]?.GetValue<string>() ?? "";
+
+        var logPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "RDV", "run.log");
+        try { Directory.CreateDirectory(Path.GetDirectoryName(logPath)!); } catch { }
+
+        try
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo(file, args)
+            {
+                UseShellExecute = false,
+                CreateNoWindow = false,
+            };
+            var p = System.Diagnostics.Process.Start(psi);
+            try { File.AppendAllText(logPath, $"{DateTime.Now:s}\tOK\tpid={p?.Id}\t{file}\t{args}\n"); } catch { }
+        }
+        catch (Exception ex)
+        {
+            try { File.AppendAllText(logPath, $"{DateTime.Now:s}\tFAIL\t{ex.GetType().Name}\t{file}\t{args}\t{ex.Message}\n"); } catch { }
         }
     }
 
