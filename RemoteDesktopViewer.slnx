@@ -1,4 +1,6 @@
 <Solution>
   <Project Path="RDV.Host/RDV.Host.csproj" />
   <Project Path="RDV.Viewer/RDV.Viewer.csproj" />
+  <Project Path="RDV.Host.Dxgi/RDV.Host.Dxgi.csproj" />
+  <Project Path="RDV.Viewer.Dxgi/RDV.Viewer.Dxgi.csproj" />
 </Solution>
