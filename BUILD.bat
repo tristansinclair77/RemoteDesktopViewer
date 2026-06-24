@@ -30,14 +30,14 @@ dotnet publish RDV.Host\RDV.Host.csproj -c Release -r win-x64 --self-contained f
   -p:PublishSingleFile=true -p:DebugType=none ^
   -p:IncludeNativeLibrariesForSelfExtract=true -p:IncludeAllContentForSelfExtract=true ^
   -o "%OUT%"
-if errorlevel 1 ( echo ERROR: Host build failed. & exit /b 1 )
+if errorlevel 1 ( echo ERROR: Host build failed. & pause & exit /b 1 )
 
 echo [4/5] Publishing RDV.Viewer...
 dotnet publish RDV.Viewer\RDV.Viewer.csproj -c Release -r win-x64 --self-contained false ^
   -p:PublishSingleFile=true -p:DebugType=none ^
   -p:IncludeNativeLibrariesForSelfExtract=true -p:IncludeAllContentForSelfExtract=true ^
   -o "%OUT%"
-if errorlevel 1 ( echo ERROR: Viewer build failed. & exit /b 1 )
+if errorlevel 1 ( echo ERROR: Viewer build failed. & pause & exit /b 1 )
 
 echo [5/5] Signing executables...
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
@@ -47,9 +47,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "  if ($sig.Status -ne 'Valid') { Write-Host \"ERROR: signing $exe -> $($sig.Status)\"; exit 1 }" ^
   "  Write-Host \"  $exe -> $($sig.Status)\"" ^
   "}"
-if errorlevel 1 ( echo ERROR: Signing failed. & exit /b 1 )
+if errorlevel 1 ( echo ERROR: Signing failed. & pause & exit /b 1 )
 
 echo.
 echo Build complete. Output: %OUT%
 echo   RDV.Host.exe   — run on the home PC (as Administrator, first time)
 echo   RDV.Viewer.exe — run on the work laptop
+pause

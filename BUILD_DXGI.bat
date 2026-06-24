@@ -33,14 +33,14 @@ dotnet publish RDV.Host.Dxgi\RDV.Host.Dxgi.csproj -c Release -r win-x64 --self-c
   -p:PublishSingleFile=true -p:DebugType=none ^
   -p:IncludeNativeLibrariesForSelfExtract=true -p:IncludeAllContentForSelfExtract=true ^
   -o "%OUT%"
-if errorlevel 1 ( echo ERROR: DXGI Host build failed. & exit /b 1 )
+if errorlevel 1 ( echo ERROR: DXGI Host build failed. & pause & exit /b 1 )
 
 echo [3/4] Publishing RDV.Viewer.Dxgi (self-contained .NET 8)...
 dotnet publish RDV.Viewer.Dxgi\RDV.Viewer.Dxgi.csproj -c Release -r win-x64 --self-contained true ^
   -p:PublishSingleFile=true -p:DebugType=none ^
   -p:IncludeNativeLibrariesForSelfExtract=true -p:IncludeAllContentForSelfExtract=true ^
   -o "%OUT%"
-if errorlevel 1 ( echo ERROR: DXGI Viewer build failed. & exit /b 1 )
+if errorlevel 1 ( echo ERROR: DXGI Viewer build failed. & pause & exit /b 1 )
 
 echo [4/4] Signing executables...
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
@@ -50,9 +50,10 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "  if ($sig.Status -ne 'Valid') { Write-Host \"ERROR: signing $exe -> $($sig.Status)\"; exit 1 }" ^
   "  Write-Host \"  $exe -> $($sig.Status)\"" ^
   "}"
-if errorlevel 1 ( echo ERROR: Signing failed. & exit /b 1 )
+if errorlevel 1 ( echo ERROR: Signing failed. & pause & exit /b 1 )
 
 echo.
 echo DXGI build complete. Output:
 echo   %OUT%\RDV.Host.Dxgi.exe   - DXGI Desktop Duplication host (port 8766, separate config)
 echo   %OUT%\RDV.Viewer.Dxgi.exe - matching viewer (default port 8766)
+pause
