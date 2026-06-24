@@ -1,7 +1,7 @@
 @echo off
 setlocal
 
-set OUT=C:\ProgramData\i2Systems\Tools\RemoteDesktopViewer
+set OUT=%~dp0dist
 set THUMBPRINT=B93F080C077A15FBDB3A0850B47429CB142CADF4
 set TIMESTAMP=http://timestamp.digicert.com
 
@@ -40,17 +40,11 @@ dotnet publish RDV.Viewer\RDV.Viewer.csproj -c Release -r win-x64 --self-contain
 if errorlevel 1 ( echo ERROR: Viewer build failed. & pause & exit /b 1 )
 
 echo [5/5] Signing executables...
-powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-  "$cert = Get-ChildItem 'Cert:\CurrentUser\My\%THUMBPRINT%' -ErrorAction Stop;" ^
-  "foreach ($exe in 'RDV.Host.exe','RDV.Viewer.exe') {" ^
-  "  $sig = Set-AuthenticodeSignature -FilePath \"%OUT%\$exe\" -Certificate $cert -HashAlgorithm SHA256 -TimestampServer '%TIMESTAMP%' -IncludeChain All;" ^
-  "  if ($sig.Status -ne 'Valid') { Write-Host \"ERROR: signing $exe -> $($sig.Status)\"; exit 1 }" ^
-  "  Write-Host \"  $exe -> $($sig.Status)\"" ^
-  "}"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$tp='%THUMBPRINT%'; $ts='%TIMESTAMP%'; $out='%OUT%'; $cert=Get-ChildItem Cert:\CurrentUser\My | Where-Object { $_.Thumbprint -eq $tp }; if (!$cert) { Write-Host 'ERROR: cert not found'; exit 1 }; foreach ($exe in 'RDV.Host.exe','RDV.Viewer.exe') { $sig=Set-AuthenticodeSignature -FilePath \"$out\$exe\" -Certificate $cert -HashAlgorithm SHA256 -TimestampServer $ts -IncludeChain All; if ($sig.Status -ne 'Valid') { Write-Host \"ERROR: signing $exe -> $($sig.Status)\"; exit 1 }; Write-Host \"  $exe -> $($sig.Status)\" }"
 if errorlevel 1 ( echo ERROR: Signing failed. & pause & exit /b 1 )
 
 echo.
 echo Build complete. Output: %OUT%
-echo   RDV.Host.exe   — run on the home PC (as Administrator, first time)
-echo   RDV.Viewer.exe — run on the work laptop
+echo   RDV.Host.exe   - run on the home PC (as Administrator, first time)
+echo   RDV.Viewer.exe - run on the work laptop
 pause
