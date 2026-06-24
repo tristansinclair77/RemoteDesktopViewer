@@ -6,7 +6,7 @@ REM RDV.Viewer EXEs in dist\ -- writes RDV.Host.Dxgi.exe and RDV.Viewer.Dxgi.exe
 REM Safe to run while RDV.Host.exe is still serving a remote session.
 
 set OUT=%~dp0dist
-set THUMBPRINT=2BD8E89BABDE8EE56906BDD577BB1E794AA797DC
+set THUMBPRINT=B93F080C077A15FBDB3A0850B47429CB142CADF4
 set TIMESTAMP=http://timestamp.digicert.com
 
 echo [1/4] Stopping any running DXGI processes (original RDV.Host left alone)...

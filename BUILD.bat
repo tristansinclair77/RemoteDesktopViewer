@@ -2,7 +2,7 @@
 setlocal
 
 set OUT=C:\ProgramData\i2Systems\Tools\RemoteDesktopViewer
-set THUMBPRINT=2BD8E89BABDE8EE56906BDD577BB1E794AA797DC
+set THUMBPRINT=B93F080C077A15FBDB3A0850B47429CB142CADF4
 set TIMESTAMP=http://timestamp.digicert.com
 
 echo [1/5] Stopping any running RDV processes...
