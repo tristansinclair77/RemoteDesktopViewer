@@ -100,6 +100,7 @@ public sealed class HostServer : IDisposable
 
             await SendText(ws, JsonSerializer.Serialize(new { type = "auth_ok" }), ct);
             StatusChanged?.Invoke("Client connected");
+            SleepBlocker.Prevent();
 
             using var capture = new DxgiScreenCapture(40);
 
@@ -136,6 +137,7 @@ public sealed class HostServer : IDisposable
         catch { }
         finally
         {
+            SleepBlocker.Allow();
             _clientConnected = false;
             StatusChanged?.Invoke($"Listening on port {_config.Port}");
             if (ws.State == WebSocketState.Open)
